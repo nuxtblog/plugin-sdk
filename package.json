@@ -1,0 +1,30 @@
+{
+  "name": "@nuxtblog/plugin-sdk",
+  "version": "0.0.0",
+  "description": "TypeScript type definitions and base tsconfig for nuxtblog plugins",
+  "types": "index.d.ts",
+  "files": [
+    "index.d.ts",
+    "tsconfig.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nuxtblog/plugin-sdk.git"
+  },
+  "homepage": "https://github.com/nuxtblog/plugin-sdk",
+  "bugs": {
+    "url": "https://github.com/nuxtblog/plugin-sdk/issues"
+  },
+  "keywords": [
+    "nuxtblog",
+    "plugin",
+    "sdk",
+    "typescript"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "release": "npm version patch && npm publish --access public",
+    "release:minor": "npm version minor && npm publish --access public",
+    "release:major": "npm version major && npm publish --access public"
+  }
+}
