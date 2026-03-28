@@ -24,36 +24,39 @@ pnpm add -D @nuxtblog/plugin-sdk
 This gives you:
 
 - Strict TypeScript compiler options tuned for plugin bundles
-- The global `blog` object with full type coverage (`blog.on`, `blog.filter`, `blog.log`, `blog.http`, `blog.store`, `blog.settings`)
+- The global `blog` object with full type coverage (`nuxtblog.on`, `nuxtblog.filter`, `nuxtblog.log`, `nuxtblog.http`, `nuxtblog.store`, `nuxtblog.settings`)
 
 ### Example plugin
 
 ```ts
 // src/index.ts
 
-blog.on("post.published", (payload) => {
-  blog.log(`Post published: ${payload.title}`)
+nuxtblog.on("post.published", (payload) => {
+  nuxtblog.log.info(`Post published: ${payload.title}`)
 })
 
-blog.filter("content.render", (data) => {
+nuxtblog.filter("content.render", (data) => {
   data.content = data.content.replace(/foo/g, "bar")
   return data
 })
 ```
 
-## Plugin manifest (plugin.json)
+## Plugin manifest (package.json)
 
-Every plugin must ship a `plugin.json` at the zip root:
+Every plugin declares its metadata in `package.json` using the `"plugin"` field:
 
 ```json
 {
   "name":        "owner/repo",
-  "title":       "My Plugin",
-  "description": "What it does",
   "version":     "1.0.0",
+  "description": "What it does",
   "author":      "owner",
-  "icon":        "i-tabler-plug",
-  "entry":       "index.js"
+  "license":     "MIT",
+  "plugin": {
+    "title":  "My Plugin",
+    "icon":   "i-tabler-plug",
+    "entry":  "index.js"
+  }
 }
 ```
 

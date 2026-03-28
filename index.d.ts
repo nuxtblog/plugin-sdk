@@ -1,5 +1,5 @@
 /**
- * plugin.json — manifest fields
+ * package.json "plugin" field — manifest fields
  *
  * {
  *   "name":        "owner/repo",          // required, unique plugin ID
@@ -368,7 +368,7 @@ interface BlogFilter {
 // Global blog object
 // ---------------------------------------------------------------------------
 
-declare const blog: {
+declare const nuxtblog: {
   /** Subscribe to a fire-and-forget event (async, cannot modify data). */
   on: BlogOn
 
@@ -381,7 +381,12 @@ declare const blog: {
   filter: BlogFilter
 
   /** Write a message to the server log (prefixed with [plugin:<id>]). */
-  log(message: string): void
+  log: {
+    info(message: string): void
+    warn(message: string): void
+    error(message: string): void
+    debug(message: string): void
+  }
 
   http: {
     /**
