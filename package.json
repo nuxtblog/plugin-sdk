@@ -1,6 +1,6 @@
 {
   "name": "@nuxtblog/plugin-sdk",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "TypeScript type definitions and base tsconfig for nuxtblog plugins",
   "types": "index.d.ts",
   "files": [
