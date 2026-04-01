@@ -2,7 +2,7 @@
 
 TypeScript type definitions and developer guide for [nuxtblog](https://github.com/nuxtblog/nuxtblog) plugins.
 
-English(README.md)|(中文文档](README.zh.md)
+[English](README.md)|[中文文档](README.zh.md)
 
 ---
 

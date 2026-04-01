@@ -2,7 +2,7 @@
 
 nuxtblog 插件 TypeScript 类型定义与完整开发指南。
 
-English(README.md)|(中文文档](README.zh.md)
+[English](README.md)|[中文文档](README.zh.md)
 
 ---
 
