@@ -5,7 +5,8 @@
   "types": "index.d.ts",
   "files": [
     "index.d.ts",
-    "tsconfig.json"
+    "tsconfig.json",
+    "README.md"
   ],
   "repository": {
     "type": "git",
