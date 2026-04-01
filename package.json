@@ -1,12 +1,13 @@
 {
   "name": "@nuxtblog/plugin-sdk",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "TypeScript type definitions and base tsconfig for nuxtblog plugins",
   "types": "index.d.ts",
   "files": [
     "index.d.ts",
     "tsconfig.json",
-    "README.md"
+    "README.md",
+    "README.zh.md"
   ],
   "repository": {
     "type": "git",
