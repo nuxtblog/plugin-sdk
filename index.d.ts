@@ -1,64 +1,106 @@
 /**
- * @nuxtblog/plugin-sdk — Type declarations for nuxtblog plugins
+ * @nuxtblog/plugin-sdk — Type declarations for nuxtblog plugins (v0.1.0)
+ *
+ * Covers: Phase 0-5 of the plugin framework upgrade.
  *
  * ─── Manifest (package.json "plugin" field) ──────────────────────────────────
  *
  * {
- *   "name":        "owner/repo",          // required, unique plugin ID
- *   "title":       "My Plugin",
- *   "description": "...",
- *   "version":     "1.0.0",
- *   "author":      "owner",
- *   "icon":        "i-tabler-plug",        // any Tabler / Lucide icon name
- *   "entry":       "dist/index.js",        // bundled JS entry (default: dist/index.js)
- *   "css":         ".my-class { ... }",    // optional CSS injected into frontend <head>
- *   "priority":    10,                     // execution order: lower runs first (default: 10)
- *   "settings":    [ ... ],                // see SettingField below
- *   "capabilities": {                      // required — only declared APIs are injected
+ *   "name":           "owner/slug",         // required, unique plugin ID (owner/slug format)
+ *   "title":          "My Plugin",
+ *   "description":    "...",
+ *   "version":        "1.0.0",
+ *   "author":         "owner",
+ *   "icon":           "i-tabler-plug",      // any Tabler / Lucide icon name
+ *   "entry":          "index.js",           // bundled server-side JS entry (goja VM)
+ *   "admin_js":       "admin.js",           // browser-side script for admin panel
+ *   "public_js":      "public.js",          // browser-side script for public frontend
+ *   "css":            ".my-class { ... }",  // optional CSS injected into frontend <head>
+ *   "priority":       10,                   // execution order: lower runs first (default: 10)
+ *   "minHostVersion": "2.0.0",             // reject load if host is older
+ *   "sdkVersion":     "0.1.0",             // SDK version this plugin targets
+ *   "trust_level":    "community",          // "official" | "community" | "local"
+ *   "activationEvents": [                   // lazy-load triggers (omit = onStartup)
+ *     "onEvent:post.published",
+ *     "onEvent:post.*",
+ *     "onCommand:my-plugin:action",
+ *     "onRoute:/admin/posts/*",
+ *     "onStartup"
+ *   ],
+ *   "capabilities": {
  *     "http":   { "allow": ["api.example.com"], "timeout_ms": 5000 },
  *     "store":  { "read": true, "write": true },
- *     "events": { "subscribe": ["post.*"] }
+ *     "events": { "subscribe": ["post.*"] },
+ *     "db":     true,    // access to plugin-prefixed DB tables
+ *     "ai":     true     // access to nuxtblog.ai service
  *   },
- *   "webhooks": [
- *     // Declarative outbound webhooks — no JS needed.
- *     // url and header values support {{settings.key}} to read admin-configured values
- *     // at dispatch time (30-second TTL cache). Never hardcode secrets in the manifest.
- *     {
- *       "url": "{{settings.webhook_url}}",
- *       "events": ["post.*"],
- *       "headers": { "Authorization": "Bearer {{settings.webhook_token}}" }
- *     }
- *   ],
- *   "pipelines": [                         // declarative multi-step async workflows
- *     {
- *       "name": "post-publish",
- *       "trigger": "post.published",
- *       "steps": [
- *         { "type": "js",      "name": "Generate summary", "fn": "generateSummary", "timeout_ms": 8000, "retry": 1 },
- *         {
- *           // webhook step url also supports {{settings.key}}
- *           "type": "webhook", "name": "Notify Slack",
- *           "url": "{{settings.slack_webhook_url}}", "headers": {}
- *         },
- *         {
- *           "type": "condition", "name": "Branch by category",
- *           "if": "ctx.data.category === 'tech'",
- *           "then": [ { "type": "js", "name": "Tweet it", "fn": "postTweet" } ],
- *           "else": [ { "type": "js", "name": "Log skip", "fn": "logSkip" }  ]
- *         }
- *       ]
- *     }
- *   ]
+ *   "settings":    [ ... ],                 // see SettingField
+ *   "contributes": { ... },                 // UI contribution points
+ *   "routes":      [ ... ],                 // custom HTTP endpoints
+ *   "migrations":  [ ... ],                 // DB schema migrations
+ *   "pages":       [ ... ],                 // frontend route extensions
+ *   "service":     { ... },                 // external service proxy
+ *   "webhooks":    [ ... ],                 // outbound webhooks
+ *   "pipelines":   [ ... ]                  // async multi-step workflows
  * }
  *
  * ─── Plugin API overview ─────────────────────────────────────────────────────
  *
- *   nuxtblog.filter(event, (ctx) => { })   ← guard: sync, can abort, HTTP blocked
- *   nuxtblog.on(event, (data) => { })      ← simple response: async, HTTP allowed
- *   function myStep(ctx: StepContext) { }  ← pipeline step: async, HTTP allowed
- *   manifest.webhooks                      ← outbound POST, no JS needed
- *   manifest.pipelines                     ← multi-step workflow with retry/condition
+ *   // Lifecycle (recommended)
+ *   export function activate(ctx: PluginContext) {
+ *     ctx.subscriptions.push(
+ *       nuxtblog.filter('post.create', handler),
+ *       nuxtblog.on('post.published', handler),
+ *       nuxtblog.commands.register('my:action', handler),
+ *     )
+ *   }
+ *   export function deactivate() { }  // optional — called on unload/hot-reload
+ *
+ *   // Legacy (still supported, deprecation warning)
+ *   nuxtblog.filter(event, (ctx) => { })
+ *   nuxtblog.on(event, (data) => { })
+ *
+ *   // Pipeline step (exported function, called by engine)
+ *   export function myStep(ctx: StepContext) { }
+ *
+ *   // Route handler (exported function, called by engine)
+ *   export function handleInvoke(req: PluginRequest): PluginResponse { }
  */
+
+// ---------------------------------------------------------------------------
+// Disposable  (returned by nuxtblog.on / nuxtblog.filter / commands.register)
+// ---------------------------------------------------------------------------
+
+/**
+ * A Disposable represents a registered handler that can be removed.
+ * Push it into `ctx.subscriptions` and the engine will call dispose()
+ * automatically when the plugin is unloaded or hot-reloaded.
+ *
+ * @example
+ * export function activate(ctx: PluginContext) {
+ *   ctx.subscriptions.push(
+ *     nuxtblog.on('post.published', handlePublish),
+ *     nuxtblog.filter('post.create', handleCreate),
+ *   )
+ * }
+ */
+interface Disposable {
+  dispose(): void
+}
+
+// ---------------------------------------------------------------------------
+// PluginContext  (passed to activate())
+// ---------------------------------------------------------------------------
+
+/**
+ * Context object passed to the exported `activate(ctx)` function.
+ * All Disposables pushed into `ctx.subscriptions` are automatically
+ * disposed when the plugin is unloaded or hot-reloaded.
+ */
+interface PluginContext {
+  /** Push Disposables here; engine disposes them all on unload. */
+  subscriptions: Disposable[]
+}
 
 // ---------------------------------------------------------------------------
 // Filter context  (nuxtblog.filter handlers)
@@ -113,8 +155,6 @@ interface PluginCtx<T extends Record<string, unknown> = Record<string, unknown>>
  *   - allows `nuxtblog.http.fetch` calls
  *   - has no `input` snapshot or `next()` method
  *
- * Export the function at module scope — the pipeline engine looks it up by name.
- *
  * @example
  * // In package.json pipeline step: { "type": "js", "fn": "generateSummary" }
  * function generateSummary(ctx: StepContext) {
@@ -133,6 +173,40 @@ interface StepContext<T extends Record<string, unknown> = Record<string, unknown
   meta: Record<string, unknown>
   /** Stop the pipeline immediately. Subsequent steps are skipped. */
   abort(reason: string): void
+}
+
+// ---------------------------------------------------------------------------
+// Route handler types (Phase 2.7)
+// ---------------------------------------------------------------------------
+
+/**
+ * Request object passed to plugin route handler functions.
+ *
+ * @example
+ * export function handleInvoke(req: PluginRequest): PluginResponse {
+ *   const { action, text } = req.body as any
+ *   return { status: 200, body: { data: 'processed' } }
+ * }
+ */
+interface PluginRequest {
+  method: string
+  path: string
+  query: Record<string, string>
+  body: unknown
+  headers: Record<string, string>
+  /** Present when route auth != "public". */
+  userId?: number
+  /** Present when route auth != "public". */
+  userRole?: string
+}
+
+/**
+ * Response returned by plugin route handler functions.
+ */
+interface PluginResponse {
+  status: number
+  body: unknown
+  headers?: Record<string, string>
 }
 
 // ---------------------------------------------------------------------------
@@ -385,6 +459,24 @@ interface FilterPostDeleteData {
   [key: string]: unknown
 }
 
+/** Fires before status changes to published. Abort to prevent publishing. */
+interface FilterPostPublishData {
+  id: number
+  title: string
+  slug: string
+  content: string
+  excerpt: string
+  [key: string]: unknown
+}
+
+/** Fires before restoring a post from trash. Abort to prevent restore. */
+interface FilterPostRestoreData {
+  id: number
+  title: string
+  slug: string
+  [key: string]: unknown
+}
+
 interface FilterCommentCreateData {
   content: string
   author_name: string
@@ -394,6 +486,13 @@ interface FilterCommentCreateData {
 
 interface FilterCommentDeleteData {
   id: number
+  [key: string]: unknown
+}
+
+/** Fires before a comment is edited. */
+interface FilterCommentUpdateData {
+  id: number
+  content: string
   [key: string]: unknown
 }
 
@@ -416,6 +515,13 @@ interface FilterUserUpdateData {
   bio?: string
   locale?: string
   status?: number
+  [key: string]: unknown
+}
+
+/** Fires before login. Abort to block the login attempt. */
+interface FilterUserLoginData {
+  username: string
+  email: string
   [key: string]: unknown
 }
 
@@ -475,6 +581,133 @@ interface BlogStore {
   set(key: string, value: unknown): void
   /** Removes the entry for `key`. */
   delete(key: string): void
+
+  /**
+   * Returns all stored keys, optionally filtered to those starting with `prefix`.
+   * @example nuxtblog.store.list('cache:') -> ['cache:post-1', 'cache:post-2']
+   */
+  list(prefix?: string): string[]
+
+  /**
+   * Batch-reads multiple keys in a single DB query.
+   * Missing keys are omitted from the result.
+   */
+  getMany(keys: string[]): Record<string, unknown>
+
+  /**
+   * Deletes all entries whose key starts with `prefix`.
+   * Returns the number of deleted entries.
+   */
+  deletePrefix(prefix: string): number
+
+  /**
+   * Atomically increments a numeric store value by `delta` (default 1).
+   * Creates the entry at 0 before incrementing if it does not exist.
+   * Returns the new value.
+   * @example nuxtblog.store.increment('views:post-42') -> 1
+   */
+  increment(key: string, delta?: number): number
+}
+
+// ---------------------------------------------------------------------------
+// nuxtblog.db (Phase 4.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Plugin database access. Only available when `capabilities.db` is true.
+ * All table names must be prefixed with `plugin_{sanitized_id}_`.
+ */
+interface BlogDB {
+  /**
+   * Run a SELECT query on plugin-prefixed tables.
+   * Returns an array of row objects, or null on error.
+   *
+   * @example
+   * const rows = nuxtblog.db.query(
+   *   'SELECT * FROM plugin_my_plugin_items WHERE status = ? LIMIT ?',
+   *   'active', 20
+   * )
+   */
+  query(sql: string, ...args: unknown[]): Array<Record<string, unknown>> | null
+
+  /**
+   * Run an INSERT/UPDATE/DELETE on plugin-prefixed tables.
+   * Returns the number of affected rows, or 0 on error.
+   *
+   * @example
+   * const affected = nuxtblog.db.execute(
+   *   'INSERT INTO plugin_my_plugin_items (title, content) VALUES (?, ?)',
+   *   'Hello', 'World'
+   * )
+   */
+  execute(sql: string, ...args: unknown[]): number
+}
+
+// ---------------------------------------------------------------------------
+// nuxtblog.ai (Phase 5.1)
+// ---------------------------------------------------------------------------
+
+/** Result from AI service calls. */
+interface AIResult {
+  ok: boolean
+  /** The generated text on success. */
+  text?: string
+  /** Error message on failure. */
+  error?: string
+}
+
+/**
+ * AI service abstraction. Only available when `capabilities.ai` is true.
+ * Uses the host's configured AI provider — plugin does not manage API keys.
+ */
+interface BlogAI {
+  /**
+   * Polish/improve the given content.
+   * @param content Text to polish
+   * @param style Optional style hint (e.g. "formal", "casual")
+   */
+  polish(content: string, style?: string): AIResult
+
+  /**
+   * Generate a summary of the content.
+   * @param content Text to summarize
+   * @param maxLength Maximum summary length in characters (default 200)
+   */
+  summarize(content: string, maxLength?: number): AIResult
+
+  /**
+   * Suggest tags based on title and content.
+   * @returns AIResult where `text` is a comma-separated list of tags
+   */
+  suggestTags(title: string, content: string): AIResult
+
+  /**
+   * Translate content to the target language.
+   * @param content Text to translate
+   * @param targetLang Target language code (e.g. "en", "zh", "ja")
+   */
+  translate(content: string, targetLang: string): AIResult
+}
+
+// ---------------------------------------------------------------------------
+// nuxtblog.commands (Phase 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Server-side command registry. Commands can be invoked from admin_js
+ * via `nuxtblogAdmin.commands.execute()` or from other plugins.
+ */
+interface BlogCommands {
+  /**
+   * Register a command handler. Returns a Disposable.
+   * Command IDs should be namespaced: "plugin-id:action-name".
+   */
+  register(id: string, handler: (...args: unknown[]) => void | Promise<void>): Disposable
+
+  /**
+   * Execute a registered command by ID.
+   */
+  execute(id: string, ...args: unknown[]): Promise<void>
 }
 
 // ---------------------------------------------------------------------------
@@ -483,91 +716,92 @@ interface BlogStore {
 
 interface BlogOn {
   // Post
-  (event: "post.created",   handler: (payload: PostCreatedPayload)   => void): void
-  (event: "post.updated",   handler: (payload: PostUpdatedPayload)   => void): void
-  (event: "post.published", handler: (payload: PostPublishedPayload) => void): void
-  (event: "post.deleted",   handler: (payload: PostDeletedPayload)   => void): void
-  (event: "post.viewed",    handler: (payload: PostViewedPayload)    => void): void
+  (event: "post.created",   handler: (payload: PostCreatedPayload)   => void): Disposable
+  (event: "post.updated",   handler: (payload: PostUpdatedPayload)   => void): Disposable
+  (event: "post.published", handler: (payload: PostPublishedPayload) => void): Disposable
+  (event: "post.deleted",   handler: (payload: PostDeletedPayload)   => void): Disposable
+  (event: "post.viewed",    handler: (payload: PostViewedPayload)    => void): Disposable
   // Comment
-  (event: "comment.created",        handler: (payload: CommentCreatedPayload)        => void): void
-  (event: "comment.deleted",        handler: (payload: CommentDeletedPayload)        => void): void
-  (event: "comment.status_changed", handler: (payload: CommentStatusChangedPayload) => void): void
-  (event: "comment.approved",       handler: (payload: CommentApprovedPayload)       => void): void
+  (event: "comment.created",        handler: (payload: CommentCreatedPayload)        => void): Disposable
+  (event: "comment.deleted",        handler: (payload: CommentDeletedPayload)        => void): Disposable
+  (event: "comment.status_changed", handler: (payload: CommentStatusChangedPayload) => void): Disposable
+  (event: "comment.approved",       handler: (payload: CommentApprovedPayload)       => void): Disposable
   // User
-  (event: "user.registered", handler: (payload: UserRegisteredPayload) => void): void
-  (event: "user.updated",    handler: (payload: UserUpdatedPayload)    => void): void
-  (event: "user.deleted",    handler: (payload: UserDeletedPayload)    => void): void
-  (event: "user.followed",   handler: (payload: UserFollowedPayload)   => void): void
-  (event: "user.login",      handler: (payload: UserLoginPayload)      => void): void
-  (event: "user.logout",     handler: (payload: UserLogoutPayload)     => void): void
+  (event: "user.registered", handler: (payload: UserRegisteredPayload) => void): Disposable
+  (event: "user.updated",    handler: (payload: UserUpdatedPayload)    => void): Disposable
+  (event: "user.deleted",    handler: (payload: UserDeletedPayload)    => void): Disposable
+  (event: "user.followed",   handler: (payload: UserFollowedPayload)   => void): Disposable
+  (event: "user.login",      handler: (payload: UserLoginPayload)      => void): Disposable
+  (event: "user.logout",     handler: (payload: UserLogoutPayload)     => void): Disposable
   // Media
-  (event: "media.uploaded", handler: (payload: MediaUploadedPayload) => void): void
-  (event: "media.deleted",  handler: (payload: MediaDeletedPayload)  => void): void
+  (event: "media.uploaded", handler: (payload: MediaUploadedPayload) => void): Disposable
+  (event: "media.deleted",  handler: (payload: MediaDeletedPayload)  => void): Disposable
   // Taxonomy / Term
-  (event: "taxonomy.created", handler: (payload: TaxonomyCreatedPayload) => void): void
-  (event: "taxonomy.deleted", handler: (payload: TaxonomyDeletedPayload) => void): void
-  (event: "term.created",     handler: (payload: TermCreatedPayload)     => void): void
-  (event: "term.deleted",     handler: (payload: TermDeletedPayload)     => void): void
+  (event: "taxonomy.created", handler: (payload: TaxonomyCreatedPayload) => void): Disposable
+  (event: "taxonomy.deleted", handler: (payload: TaxonomyDeletedPayload) => void): Disposable
+  (event: "term.created",     handler: (payload: TermCreatedPayload)     => void): Disposable
+  (event: "term.deleted",     handler: (payload: TermDeletedPayload)     => void): Disposable
   // Reaction / Checkin
-  (event: "reaction.added",   handler: (payload: ReactionPayload) => void): void
-  (event: "reaction.removed", handler: (payload: ReactionPayload) => void): void
-  (event: "checkin.done",     handler: (payload: CheckinPayload)  => void): void
+  (event: "reaction.added",   handler: (payload: ReactionPayload) => void): Disposable
+  (event: "reaction.removed", handler: (payload: ReactionPayload) => void): Disposable
+  (event: "checkin.done",     handler: (payload: CheckinPayload)  => void): Disposable
   // System
-  (event: "option.updated",     handler: (payload: OptionUpdatedPayload)     => void): void
-  (event: "plugin.installed",   handler: (payload: PluginInstalledPayload)   => void): void
-  (event: "plugin.uninstalled", handler: (payload: PluginUninstalledPayload) => void): void
-  /** Fallback for custom / future events */
-  (event: string, handler: (payload: unknown) => void): void
+  (event: "option.updated",     handler: (payload: OptionUpdatedPayload)     => void): Disposable
+  (event: "plugin.installed",   handler: (payload: PluginInstalledPayload)   => void): Disposable
+  (event: "plugin.uninstalled", handler: (payload: PluginUninstalledPayload) => void): Disposable
+  /** Fallback for custom / future events (including inter-plugin events) */
+  (event: string, handler: (payload: unknown) => void): Disposable
 }
 
 // ---------------------------------------------------------------------------
 // nuxtblog.filter — typed overloads
-//
-// Handlers receive a PluginCtx. Modify ctx.data to change the data that will
-// be persisted. Call ctx.abort(reason) to reject the operation entirely.
-// Calling ctx.next() is optional — the chain continues unless abort() is called.
 // ---------------------------------------------------------------------------
 
 interface BlogFilter {
   (event: "post.create",
-   handler: (ctx: PluginCtx<FilterPostCreateData>) => void): void
+   handler: (ctx: PluginCtx<FilterPostCreateData>) => void): Disposable
   (event: "post.update",
-   handler: (ctx: PluginCtx<FilterPostUpdateData>) => void): void
+   handler: (ctx: PluginCtx<FilterPostUpdateData>) => void): Disposable
   (event: "post.delete",
-   handler: (ctx: PluginCtx<FilterPostDeleteData>) => void): void
+   handler: (ctx: PluginCtx<FilterPostDeleteData>) => void): Disposable
+  /** Fires before status changes to published. Abort to prevent publishing. */
+  (event: "post.publish",
+   handler: (ctx: PluginCtx<FilterPostPublishData>) => void): Disposable
+  /** Fires before restoring from trash. Abort to prevent restore. */
+  (event: "post.restore",
+   handler: (ctx: PluginCtx<FilterPostRestoreData>) => void): Disposable
   (event: "comment.create",
-   handler: (ctx: PluginCtx<FilterCommentCreateData>) => void): void
+   handler: (ctx: PluginCtx<FilterCommentCreateData>) => void): Disposable
   (event: "comment.delete",
-   handler: (ctx: PluginCtx<FilterCommentDeleteData>) => void): void
+   handler: (ctx: PluginCtx<FilterCommentDeleteData>) => void): Disposable
+  /** Fires before a comment is edited. */
+  (event: "comment.update",
+   handler: (ctx: PluginCtx<FilterCommentUpdateData>) => void): Disposable
   (event: "term.create",
-   handler: (ctx: PluginCtx<FilterTermCreateData>) => void): void
+   handler: (ctx: PluginCtx<FilterTermCreateData>) => void): Disposable
   (event: "user.register",
-   handler: (ctx: PluginCtx<FilterUserRegisterData>) => void): void
+   handler: (ctx: PluginCtx<FilterUserRegisterData>) => void): Disposable
   (event: "user.update",
-   handler: (ctx: PluginCtx<FilterUserUpdateData>) => void): void
+   handler: (ctx: PluginCtx<FilterUserUpdateData>) => void): Disposable
+  /** Fires before login. Abort to block the login. */
+  (event: "user.login",
+   handler: (ctx: PluginCtx<FilterUserLoginData>) => void): Disposable
   (event: "media.upload",
-   handler: (ctx: PluginCtx<FilterMediaUploadData>) => void): void
+   handler: (ctx: PluginCtx<FilterMediaUploadData>) => void): Disposable
   (event: "content.render",
-   handler: (ctx: PluginCtx<FilterContentRenderData>) => void): void
+   handler: (ctx: PluginCtx<FilterContentRenderData>) => void): Disposable
   /** Fallback for custom / future filter events */
-  (event: string, handler: (ctx: PluginCtx) => void): void
+  (event: string, handler: (ctx: PluginCtx) => void): Disposable
 }
 
 // ---------------------------------------------------------------------------
-// Global nuxtblog object
+// Global nuxtblog object  (server-side, goja VM)
 // ---------------------------------------------------------------------------
 
 declare const nuxtblog: {
   /**
    * Subscribe to a fire-and-forget event (async, runs after the operation completes).
    * HTTP requests are allowed. Cannot modify or cancel the triggering operation.
-   *
-   * @example
-   * nuxtblog.on('post.published', (data) => {
-   *   nuxtblog.http.fetch('https://hooks.slack.com/...', {
-   *     method: 'POST', body: { text: 'New post: ' + data.title }
-   *   })
-   * })
    */
   on: BlogOn
 
@@ -577,19 +811,19 @@ declare const nuxtblog: {
    * Modify `ctx.data` to change the persisted values.
    * Call `ctx.abort(reason)` to reject the operation entirely.
    *
-   * ⚠️ HTTP requests (`nuxtblog.http.fetch`) are NOT allowed inside filter handlers.
-   *    Use `nuxtblog.on` or a pipeline step for async side-effects.
-   *
-   * @example
-   * nuxtblog.filter('post.create', (ctx) => {
-   *   if (!ctx.data.title) {
-   *     ctx.abort('title is required')
-   *     return
-   *   }
-   *   ctx.data.title = ctx.data.title.trim()
-   * })
+   * HTTP requests (`nuxtblog.http.fetch`) are NOT allowed inside filter handlers.
    */
   filter: BlogFilter
+
+  /**
+   * Emit a custom event that other plugins can listen to via `nuxtblog.on()`.
+   * Event name MUST contain ":" for namespacing (e.g. "my-plugin:data-ready").
+   * Dispatched asynchronously — does not block the caller.
+   *
+   * @example
+   * nuxtblog.emit('ai-polish:result-ready', { postId: 123, result: '...' })
+   */
+  emit(event: string, payload: Record<string, unknown>): void
 
   /** Write a message to the server log (prefixed with [plugin:<id>]). */
   log: {
@@ -601,24 +835,9 @@ declare const nuxtblog: {
 
   /**
    * Synchronous HTTP client. Available when the plugin declares `capabilities.http`.
-   *
-   * ⚠️ Blocked inside `nuxtblog.filter` handlers regardless of capability declarations.
-   *    Safe to use in `nuxtblog.on` handlers and pipeline JS steps.
+   * Blocked inside `nuxtblog.filter` handlers regardless of capability declarations.
    */
   http: {
-    /**
-     * Make a synchronous HTTP request. Default timeout: 15 seconds (overridable
-     * via `capabilities.http.timeout_ms` in the manifest).
-     * Returns immediately with the result (not a Promise).
-     *
-     * @example
-     * const res = nuxtblog.http.fetch<{ id: number }>('https://api.example.com/notify', {
-     *   method: 'POST',
-     *   body: { message: 'hello' },
-     *   headers: { Authorization: 'Bearer token' },
-     * })
-     * if (res.ok) nuxtblog.log.info('notified: ' + res.body.id)
-     */
     fetch<T = unknown>(url: string, opts?: FetchOptions): FetchResult<T>
   }
 
@@ -630,13 +849,134 @@ declare const nuxtblog: {
   store: BlogStore
 
   /**
-   * Read admin-configured plugin settings (set in Plugins → Settings gear icon).
-   * Always available. Cached for 30 seconds; changes take effect without restart.
-   *
-   * @example
-   * const apiKey = nuxtblog.settings.get('api_key') as string
+   * Read admin-configured plugin settings (set in Plugins > Settings).
+   * Always available. Cached for 30 seconds.
    */
   settings: {
     get(key: string): unknown
+  }
+
+  /**
+   * Plugin database access for custom tables.
+   * Available when `capabilities.db` is true.
+   * Tables must be prefixed with `plugin_{sanitized_id}_`.
+   */
+  db: BlogDB
+
+  /**
+   * AI service abstraction using the host's configured AI provider.
+   * Available when `capabilities.ai` is true.
+   * Plugin does not need to manage API keys.
+   */
+  ai: BlogAI
+
+  /**
+   * Server-side command registry.
+   * Commands registered here can be invoked from the admin panel
+   * or by other plugins.
+   */
+  commands: BlogCommands
+}
+
+// ---------------------------------------------------------------------------
+// nuxtblogAdmin — browser-side global (admin.js / admin.mjs)
+// ---------------------------------------------------------------------------
+
+/**
+ * Editor context passed to command handlers in the admin panel.
+ */
+interface EditorContext {
+  post: {
+    title: string
+    slug: string
+    content: string
+    excerpt: string
+    status: string
+  }
+  /** Currently selected text, or null if nothing selected. */
+  selection: string | null
+  /** Replace the selected text. */
+  replace(text: string): void
+  /** Insert text at the cursor position. */
+  insert(text: string): void
+  /** Replace the entire post content. */
+  setContent(html: string): void
+}
+
+/**
+ * Webview panel API for building custom UI panels in the editor sidebar.
+ */
+interface Webview {
+  /** Set the HTML content of the webview panel. */
+  html: string
+  /** Listen for messages from the webview content. */
+  onMessage(handler: (msg: unknown) => void): void
+  /** Send a message to the webview content. */
+  postMessage(msg: unknown): void
+}
+
+/**
+ * The `nuxtblogAdmin` global object available in admin.js scripts.
+ * Runs in the browser (admin panel), NOT in the goja VM.
+ */
+declare const nuxtblogAdmin: {
+  /**
+   * Watch a post field for changes. Returns a Disposable.
+   * Fields: 'post.title', 'post.slug', 'post.content', 'post.excerpt'
+   */
+  watch(
+    field: 'post.title' | 'post.slug' | 'post.content' | 'post.excerpt',
+    cb: (val: string) => void
+  ): Disposable
+
+  /**
+   * Soft-set a field value. The user can manually override it.
+   * Use this for suggestions (e.g. auto-generated slugs).
+   */
+  suggest(field: string, value: string): void
+
+  /**
+   * Force-set a field value. Overrides the current value.
+   * Only available for trust_level "official" or "local".
+   */
+  set(field: string, value: string): void
+
+  /** Read the current post draft state. */
+  getPost(): {
+    title: string
+    slug: string
+    content: string
+    excerpt: string
+    status: string
+  }
+
+  /** Command registry for the admin panel. */
+  commands: {
+    /** Register a command handler. Returns a Disposable. */
+    register(id: string, handler: (ctx: EditorContext) => void | Promise<void>): Disposable
+    /** Execute a registered command by ID. */
+    execute(id: string, ...args: unknown[]): Promise<void>
+  }
+
+  /** Webview panel registry for the editor sidebar. */
+  views: {
+    /** Register a webview panel provider. Returns a Disposable. */
+    register(id: string, provider: (webview: Webview) => void): Disposable
+  }
+
+  /**
+   * HTTP client that calls this plugin's backend routes.
+   * Automatically includes the auth token.
+   */
+  http: {
+    get<T = unknown>(path: string): Promise<{ ok: boolean; data: T; error?: string }>
+    post<T = unknown>(path: string, body: object): Promise<{ ok: boolean; data: T; error?: string }>
+  }
+
+  /** Show notifications in the admin panel. */
+  notify: {
+    success(msg: string): void
+    error(msg: string): void
+    info(msg: string): void
   }
 }
